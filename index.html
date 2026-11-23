@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="每日复盘" />
+  <meta name="theme-color" content="#ea580c" />
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="apple-touch-icon" href="./icon-192.png" />
+  <title>每日复盘 — WatchDailyMemo PWA</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: calc(74px + env(safe-area-inset-bottom));
+    }
+    .bottom-nav {
+      padding-bottom: max(10px, env(safe-area-inset-bottom));
+    }
+    .nav-active { color: #ea580c; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+  <!-- 顶部栏 -->
+  <header class="bg-white/95 backdrop-blur border-b border-slate-200 sticky top-0 z-30">
+    <div class="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-orange-600 text-white flex items-center justify-center shadow-sm">
+          <i data-lucide="mic" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 class="text-base font-bold text-slate-900 leading-tight">每日复盘</h1>
+          <p class="text-[11px] text-slate-500">Apple Watch 录音 · 潜台词洞察</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <input type="date" id="datePicker" class="text-xs sm:text-sm border border-slate-300 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500" />
+        <button id="openSettingsBtn" class="p-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 transition" aria-label="设置">
+          <i data-lucide="settings" class="w-4 h-4 text-slate-700"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Toast 提示 -->
+  <div id="toastBox" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 hidden max-w-xs w-[90%] bg-slate-900 text-white text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2">
+    <i data-lucide="info" class="w-4 h-4 text-orange-400 shrink-0"></i>
+    <span id="toastText"></span>
+  </div>
+
+  <!-- 主内容区 -->
+  <main class="max-w-3xl mx-auto px-4 py-5">
+    <!-- 页面 1: 今日复盘 -->
+    <section id="tab-report" class="space-y-4">
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3">
+        <div class="flex items-center justify-between gap-2">
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800" id="clipCountBadge">0 段记录</span>
+          <span class="text-xs text-slate-500 truncate" id="reportStatusText">已加载演示案例</span>
+        </div>
+        <h2 class="text-base font-bold text-slate-900 leading-snug" id="reportHeadline">今日复盘总览</h2>
+        <div class="flex flex-wrap gap-2">
+          <button id="analyzeBtn" class="flex-1 inline-flex items-center justify-center gap-1.5 text-sm font-semibold px-4 py-2.5 rounded-xl bg-orange-600 text-white hover:bg-orange-700 transition shadow-sm">
+            <i data-lucide="sparkles" class="w-4 h-4"></i>
+            <span>AI 分析今日</span>
+          </button>
+          <button id="exportMdBtn" class="inline-flex items-center justify-center gap-1.5 text-sm px-3 py-2.5 rounded-xl border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 transition">
+            <i data-lucide="copy" class="w-4 h-4"></i>
+            <span>复制复盘</span>
+          </button>
+          <button id="loadDemoBtn" class="text-xs px-3 py-2.5 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 transition">
+            演示
+          </button>
+        </div>
+      </div>
+
+      <!-- 维度一 -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+        <div class="flex items-center gap-2 mb-3">
+          <div class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+            <i data-lucide="check-square" class="w-4 h-4"></i>
+          </div>
+          <h3 class="text-sm font-bold text-slate-900">一、我今天做了什么</h3>
+        </div>
+        <div id="whatIDidList" class="space-y-2.5"></div>
+      </div>
+
+      <!-- 维度二 -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+        <div class="flex items-center gap-2 mb-3">
+          <div class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <i data-lucide="activity" class="w-4 h-4"></i>
+          </div>
+          <h3 class="text-sm font-bold text-slate-900">二、我今天经历了什么</h3>
+        </div>
+        <div id="whatIExperiencedBox" class="space-y-2.5"></div>
+      </div>
+
+      <!-- 维度三 -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+        <div class="flex items-center gap-2 mb-3">
+          <div class="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+            <i data-lucide="message-square-quote" class="w-4 h-4"></i>
+          </div>
+          <h3 class="text-sm font-bold text-slate-900">三、对方讲这话是什么意思</h3>
+        </div>
+        <div id="subtextList" class="space-y-3"></div>
+      </div>
+    </section>
+
+    <!-- 页面 2: 导入录音 / 转写 -->
+    <section id="tab-upload" class="hidden space-y-4">
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3">
+        <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+          <i data-lucide="upload-cloud" class="w-4 h-4 text-orange-600"></i>
+          <span>导入 Apple Watch 录音 (.m4a)</span>
+        </h3>
+        <label class="block border-2 border-dashed border-slate-300 rounded-xl p-5 text-center cursor-pointer active:bg-orange-50 hover:border-orange-500 transition">
+          <input type="file" id="audioFileInput" accept="audio/*,.m4a,.mp3,.wav" multiple class="hidden" />
+          <i data-lucide="mic" class="w-7 h-7 text-orange-500 mx-auto mb-1.5"></i>
+          <span class="text-sm font-medium text-slate-700 block">点此从 iPhone「文件」选择录音</span>
+          <span class="text-xs text-slate-400 mt-1 block">支持多选 · Gemini 可直接听音频分析</span>
+        </label>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3">
+        <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+          <i data-lucide="file-text" class="w-4 h-4 text-blue-600"></i>
+          <span>或粘贴对话 / 语音文本</span>
+        </h3>
+        <div class="flex gap-2">
+          <input type="time" id="clipTimeInput" value="14:30" class="text-sm border border-slate-300 rounded-lg px-2.5 py-1.5" />
+          <select id="clipTagInput" class="text-sm border border-slate-300 rounded-lg px-2.5 py-1.5 flex-1">
+            <option value="沟通">沟通对话</option>
+            <option value="会议">会议讨论</option>
+            <option value="日常">日常记录</option>
+            <option value="灵感">个人思考</option>
+          </select>
+        </div>
+        <textarea id="clipTextInput" rows="3" placeholder="粘贴对方说的话或今日语音备忘..." class="w-full text-sm border border-slate-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+        <button id="addTextClipBtn" class="w-full py-2.5 rounded-xl bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 transition">
+          添加到今日记录
+        </button>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-bold text-slate-900">今日片段列表</h3>
+          <button id="clearDayBtn" class="text-xs text-red-600 hover:underline">清空当日</button>
+        </div>
+        <div id="clipsQueueList" class="space-y-2.5"></div>
+      </div>
+    </section>
+
+    <!-- 页面 3: 安装与使用 -->
+    <section id="tab-guide" class="hidden space-y-3">
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3 text-xs sm:text-sm text-slate-700 leading-relaxed">
+        <h3 class="text-base font-bold text-slate-900">iPhone 桌面安装与手表配合步骤</h3>
+        <div class="p-3 rounded-xl bg-orange-50 border border-orange-200">
+          <div class="font-bold text-orange-900 mb-1">1. 添加到 iPhone 桌面</div>
+          <p class="text-orange-800">在 iPhone 自带 <strong>Safari 浏览器</strong> 打开部署后的 HTTPS 网址 → 点底部「分享」→「添加到主屏幕」，即可像原生 App 一样全屏打开。</p>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+          <div class="font-bold text-slate-900 mb-1">2. Apple Watch 快捷录音</div>
+          <p>把手表自带「语音备忘录」放到表盘复杂功能或操作按钮上，抬腕即可开录；录完自动通过 iCloud 同步到 iPhone。</p>
+        </div>
+        <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+          <div class="font-bold text-slate-900 mb-1">3. 填入 API Key 开始分析</div>
+          <p>点右上角齿轮图标填入 Gemini API Key（免费额度即可用，且直接支持 `.m4a` 音频）或 OpenAI 兼容 Key。</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- iPhone 风格底部导航栏 -->
+  <nav class="bottom-nav fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur border-t border-slate-200 z-30">
+    <div class="max-w-3xl mx-auto grid grid-cols-3 text-xs font-medium text-slate-500 pt-2">
+      <button class="tab-btn nav-active flex flex-col items-center gap-1" data-tab="report">
+        <i data-lucide="sparkles" class="w-5 h-5"></i>
+        <span>今日复盘</span>
+      </button>
+      <button class="tab-btn flex flex-col items-center gap-1" data-tab="upload">
+        <i data-lucide="plus-circle" class="w-5 h-5"></i>
+        <span>导入录音</span>
+      </button>
+      <button class="tab-btn flex flex-col items-center gap-1" data-tab="guide">
+        <i data-lucide="smartphone" class="w-5 h-5"></i>
+        <span>使用指南</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- API 设置弹窗 -->
+  <div id="settingsModal" class="fixed inset-0 z-50 hidden bg-slate-900/50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-slate-900">AI 模型与接口设置</h3>
+        <button id="closeSettingsBtn" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="space-y-3 text-sm">
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">AI 服务商</label>
+          <select id="providerSelect" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+            <option value="gemini">Google Gemini API（直接支持 .m4a 音频）</option>
+            <option value="openai">OpenAI 兼容接口（Whisper + GPT / DeepSeek）</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">API Key（仅保存在本地）</label>
+          <input type="password" id="apiKeyInput" placeholder="输入你的 API Key" class="w-full border border-slate-300 rounded-lg px-3 py-2" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-600 mb-1">模型名称</label>
+          <input type="text" id="modelInput" value="gemini-2.5-flash" class="w-full border border-slate-300 rounded-lg px-3 py-2" />
+        </div>
+        <div id="openaiEndpointWrap" class="hidden">
+          <label class="block text-xs font-medium text-slate-600 mb-1">OpenAI 兼容 Base URL</label>
+          <input type="text" id="endpointInput" value="https://api.openai.com/v1" class="w-full border border-slate-300 rounded-lg px-3 py-2" />
+        </div>
+      </div>
+      <div class="flex justify-end pt-1">
+        <button id="saveSettingsBtn" class="w-full py-2.5 rounded-xl bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 transition">保存设置</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    try {
+      if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      }
+    } catch (e) {}
+
+    const STORAGE_KEY = 'watch_daily_memo_pwa_v1';
+    const SETTINGS_KEY = 'watch_daily_memo_settings_v1';
+
+    const DEMO_DATA = {
+      clips: [
+        { id: 'd1', time: '09:40', tag: '会议', type: 'text', text: '项目晨会：产品经理说“这个需求先按现有方案走，不过下周评审时老板可能会看转化率数据，你心里有个数”。' },
+        { id: 'd2', time: '14:15', tag: '沟通', type: 'text', text: '和合作方电话：对方说“你们报价确实专业，我们内部都很认可，只是年底预算审批流程比较长，可能要等下个月再看”。' },
+        { id: 'd3', time: '19:20', tag: '日常', type: 'text', text: '下班路上语音备忘：今天改了三版方案有点累，但终于把核心逻辑理顺了，晚上想早点休息。' }
+      ],
+      report: {
+        rawSummary: '今天主要围绕产品方案推进与合作方沟通展开，节奏紧凑，傍晚略感疲惫但主线清晰。',
+        whatIDid: [
+          { timeRange: '09:40 - 10:10', title: '参加项目晨会并确认当前上线方案', detail: '明确先按现有方案推进，同时提前准备下周评审的转化率数据。', category: '工作' },
+          { timeRange: '14:15 - 14:40', title: '与合作方电话沟通报价与立项进度', detail: '跟进合作方内部审批反馈，对方暂未给出明确签约时间。', category: '沟通' },
+          { timeRange: '19:20', title: '复盘当日方案修改并记录状态', detail: '完成三版方案逻辑梳理，决定今晚以恢复精力为主。', category: '思考' }
+        ],
+        whatIExperienced: {
+          overallMood: '充实中带轻微压力',
+          energyArc: '上午专注度高 → 下午商务沟通后略消耗 → 傍晚收尾有完成感',
+          highlights: ['成功把三版方案的核心逻辑理顺'],
+          frictionPoints: ['合作方未给明确时间节点', '高强度改稿导致晚间疲惫'],
+          reflection: '关键节点推进得很扎实；面对外部不确定性，先把可控的数据准备好会更有把握。'
+        },
+        subtextInsights: [
+          {
+            speakerOrContext: '产品经理（上午晨会）',
+            quote: '这个需求先按现有方案走，不过下周评审时老板可能会看转化率数据，你心里有个数。',
+            literalMeaning: '先按现状执行，下周老板会关注转化率。',
+            realIntent: '他在提前打预防针并共担评审风险——如果下周转化率不好看，现有方案可能被否定，希望你提前准备数据归因或备选方案。',
+            emotionAndAttitude: '表面配合、实则谨慎提醒',
+            suggestedResponse: '会后发消息确认：“转化率埋点我今天拉一下基线数据，评审前我们先对齐一版预期。”'
+          },
+          {
+            speakerOrContext: '合作方对接人（下午电话）',
+            quote: '你们报价确实专业，我们内部都很认可，只是年底预算审批流程比较长，可能要等下个月再看。',
+            literalMeaning: '认可专业度，但年底流程慢，需要下个月再推进。',
+            realIntent: '典型的“礼貌性缓兵之计”：大概率预算不足、当前并非第一优先级，或对方还在对比其他更低价方案。',
+            emotionAndAttitude: '客气、回避直接拒绝、保留备选余地',
+            suggestedResponse: '主动下探真实卡点：“理解年底节奏，为方便您内部报批，我可以把报价拆成首期轻量版和完整版两档供参考？”'
+          }
+        ]
+      }
+    };
+
+    let state = {
+      date: new Date().toISOString().slice(0, 10),
+      byDate: {},
+      settings: { provider: 'gemini', apiKey: '', model: 'gemini-2.5-flash', endpoint: 'https://api.openai.com/v1' }
+    };
+
+    function loadState() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) state.byDate = JSON.parse(saved);
+        const savedSet = localStorage.getItem(SETTINGS_KEY);
+        if (savedSet) state.settings = { ...state.settings, ...JSON.parse(savedSet) };
+      } catch (e) {}
+      if (!state.byDate[state.date]) {
+        state.byDate[state.date] = JSON.parse(JSON.stringify(DEMO_DATA));
+      }
+    }
+
+    function saveState() {
+      try {
+        const slim = {};
+        for (const [d, val] of Object.entries(state.byDate)) {
+          slim[d] = {
+            report: val.report,
+            clips: (val.clips || []).map(c => ({ ...c, audioBase64: undefined }))
+          };
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(slim));
+      } catch (e) {}
+    }
+
+    function showToast(msg) {
+      const box = document.getElementById('toastBox');
+      document.getElementById('toastText').textContent = msg;
+      box.classList.remove('hidden');
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => box.classList.add('hidden'), 3200);
+    }
+
+    function getCurrentDayData() {
+      if (!state.byDate[state.date]) state.byDate[state.date] = { clips: [], report: null };
+      return state.byDate[state.date];
+    }
+
+    function escapeHtml(str) {
+      return String(str || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    }
+
+    function renderAll() {
+      const day = getCurrentDayData();
+      document.getElementById('clipCountBadge').textContent = `${day.clips.length} 段记录`;
+      renderReport(day.report);
+      renderClipsQueue(day.clips);
+      lucide.createIcons();
+    }
+
+    function renderReport(report) {
+      const didEl = document.getElementById('whatIDidList');
+      const expEl = document.getElementById('whatIExperiencedBox');
+      const subEl = document.getElementById('subtextList');
+
+      if (!report) {
+        document.getElementById('reportHeadline').textContent = `${state.date} 复盘待生成`;
+        didEl.innerHTML = `<p class="text-xs text-slate-400">暂无数据，请先点底部「导入录音」添加内容。</p>`;
+        expEl.innerHTML = `<p class="text-xs text-slate-400">等待生成情绪与精力分析...</p>`;
+        subEl.innerHTML = `<p class="text-xs text-slate-400">等待拆解对方潜台词...</p>`;
+        return;
+      }
+
+      document.getElementById('reportHeadline').textContent = report.rawSummary || `${state.date} 复盘报告`;
+
+      didEl.innerHTML = (report.whatIDid || []).map(item => `
+        <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-xs font-mono font-semibold text-blue-600">${escapeHtml(item.timeRange)}</span>
+            <span class="text-[11px] px-2 py-0.5 rounded bg-slate-200 text-slate-700">${escapeHtml(item.category)}</span>
+          </div>
+          <div class="font-semibold text-slate-900 text-sm">${escapeHtml(item.title)}</div>
+          <div class="text-xs text-slate-600 mt-1">${escapeHtml(item.detail)}</div>
+        </div>
+      `).join('');
+
+      const exp = report.whatIExperienced || {};
+      expEl.innerHTML = `
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div class="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200">
+            <div class="text-[11px] text-emerald-700 font-medium">情绪基调</div>
+            <div class="text-sm font-bold text-slate-900 mt-0.5">${escapeHtml(exp.overallMood || '-')}</div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <div class="text-[11px] text-slate-500 font-medium">精力曲线</div>
+            <div class="text-xs text-slate-800 mt-0.5">${escapeHtml(exp.energyArc || '-')}</div>
+          </div>
+        </div>
+        <div class="text-xs space-y-1.5 pt-1">
+          <div><span class="font-semibold text-emerald-700">高光：</span>${escapeHtml((exp.highlights || []).join('；') || '无')}</div>
+          <div><span class="font-semibold text-amber-700">消耗：</span>${escapeHtml((exp.frictionPoints || []).join('；') || '无')}</div>
+          <div class="p-2.5 rounded-xl bg-slate-50 text-slate-700 italic mt-1">${escapeHtml(exp.reflection || '')}</div>
+        </div>
+      `;
+
+      const subs = report.subtextInsights || [];
+      subEl.innerHTML = subs.length ? subs.map(s => `
+        <div class="p-3.5 rounded-xl border border-purple-200 bg-purple-50/40 space-y-2">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800">${escapeHtml(s.speakerOrContext)}</span>
+            <span class="text-[11px] text-purple-700 font-medium">${escapeHtml(s.emotionAndAttitude)}</span>
+          </div>
+          <div class="text-xs sm:text-sm font-medium text-slate-900">“${escapeHtml(s.quote)}”</div>
+          <div class="text-xs text-slate-500">字面意思：${escapeHtml(s.literalMeaning)}</div>
+          <div class="text-xs text-slate-800 bg-white p-2.5 rounded-lg border border-purple-100">
+            <span class="font-bold text-purple-700">真实意图：</span>${escapeHtml(s.realIntent)}
+          </div>
+          <div class="text-xs text-blue-900 bg-blue-50 p-2.5 rounded-lg">
+            <span class="font-bold">建议回应：</span>${escapeHtml(s.suggestedResponse)}
+          </div>
+        </div>
+      `).join('') : `<p class="text-xs text-slate-400">当日暂无他人对话。</p>`;
+    }
+
+    function renderClipsQueue(clips) {
+      const list = document.getElementById('clipsQueueList');
+      if (!clips.length) {
+        list.innerHTML = `<p class="text-xs text-slate-400">暂无片段，请上传 .m4a 录音或粘贴文本。</p>`;
+        return;
+      }
+      list.innerHTML = clips.map(c => `
+        <div class="p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-start justify-between gap-2">
+          <div class="space-y-1 min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-mono font-semibold text-orange-600">${escapeHtml(c.time)}</span>
+              <span class="text-[11px] px-2 py-0.5 rounded bg-orange-100 text-orange-800">${escapeHtml(c.tag)}</span>
+              <span class="text-[11px] text-slate-400 truncate">${c.type === 'audio' ? escapeHtml(c.fileName) : '文本'}</span>
+            </div>
+            <p class="text-xs text-slate-700 break-words">${escapeHtml(c.text || '（待 AI 直接听取音频解析）')}</p>
+          </div>
+          <button class="delete-clip-btn text-xs text-slate-400 hover:text-red-600 shrink-0" data-id="${c.id}">删除</button>
+        </div>
+      `).join('');
+
+      list.querySelectorAll('.delete-clip-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const day = getCurrentDayData();
+          day.clips = day.clips.filter(x => x.id !== btn.dataset.id);
+          saveState();
+          renderAll();
+        });
+      });
+    }
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('nav-active'));
+        btn.classList.add('nav-active');
+        ['report', 'upload', 'guide'].forEach(t => {
+          document.getElementById('tab-' + t).classList.toggle('hidden', t !== btn.dataset.tab);
+        });
+      });
+    });
+
+    const datePicker = document.getElementById('datePicker');
+    datePicker.value = state.date;
+    datePicker.addEventListener('change', () => {
+      state.date = datePicker.value;
+      renderAll();
+    });
+
+    document.getElementById('loadDemoBtn').addEventListener('click', () => {
+      state.byDate[state.date] = JSON.parse(JSON.stringify(DEMO_DATA));
+      saveState();
+      renderAll();
+      showToast('已加载演示案例');
+    });
+
+    document.getElementById('exportMdBtn').addEventListener('click', () => {
+      const r = getCurrentDayData().report;
+      if (!r) return showToast('当前日期暂无复盘报告');
+      const md = [
+        `# ${state.date} 每日复盘`,
+        `> ${r.rawSummary || ''}`,
+        `\n## 一、我今天做了什么`,
+        ...(r.whatIDid || []).map(i => `- **${i.timeRange} [${i.category}] ${i.title}**：${i.detail}`),
+        `\n## 二、经历了什么`,
+        `- 情绪基调：${r.whatIExperienced?.overallMood || '-'}`,
+        `- 精力曲线：${r.whatIExperienced?.energyArc || '-'}`,
+        `- 总结：${r.whatIExperienced?.reflection || '-'}`,
+        `\n## 三、对方讲这话是什么意思`,
+        ...(r.subtextInsights || []).map(s => `- **${s.speakerOrContext}**：“${s.quote}”\n  - 真实意图：${s.realIntent}\n  - 建议回应：${s.suggestedResponse}`)
+      ].join('\n');
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(md).then(() => showToast('已复制 Markdown 复盘到剪贴板')).catch(() => fallbackCopy(md));
+        } else {
+          fallbackCopy(md);
+        }
+      } catch (e) { fallbackCopy(md); }
+    });
+
+    function fallbackCopy(text) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); showToast('已复制复盘文本'); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+
+    document.getElementById('addTextClipBtn').addEventListener('click', () => {
+      const text = document.getElementById('clipTextInput').value.trim();
+      if (!text) return showToast('请先输入或粘贴内容');
+      const day = getCurrentDayData();
+      day.clips.push({
+        id: 'c_' + Date.now(),
+        time: document.getElementById('clipTimeInput').value || '12:00',
+        tag: document.getElementById('clipTagInput').value,
+        type: 'text',
+        text
+      });
+      document.getElementById('clipTextInput').value = '';
+      saveState();
+      renderAll();
+      showToast('已添加到今日记录');
+    });
+
+    document.getElementById('audioFileInput').addEventListener('change', async (e) => {
+      const files = Array.from(e.target.files || []);
+      if (!files.length) return;
+      const day = getCurrentDayData();
+      for (const file of files) {
+        const base64 = await new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res(r.result.split(',')[1]);
+          r.onerror = rej;
+          r.readAsDataURL(file);
+        });
+        const dt = new Date(file.lastModified);
+        day.clips.push({
+          id: 'a_' + Date.now() + Math.random().toString(16).slice(2, 6),
+          time: dt.toTimeString().slice(0, 5),
+          tag: '录音',
+          type: 'audio',
+          fileName: file.name,
+          mimeType: file.type || 'audio/mp4',
+          audioBase64: base64,
+          rawFile: file
+        });
+      }
+      renderAll();
+      showToast(`已导入 ${files.length} 个录音，切回「今日复盘」点分析即可`);
+    });
+
+    document.getElementById('clearDayBtn').addEventListener('click', () => {
+      state.byDate[state.date] = { clips: [], report: null };
+      saveState();
+      renderAll();
+      showToast('已清空当日记录');
+    });
+
+    const modal = document.getElementById('settingsModal');
+    const providerSelect = document.getElementById('providerSelect');
+    const endpointWrap = document.getElementById('openaiEndpointWrap');
+
+    providerSelect.addEventListener('change', () => {
+      endpointWrap.classList.toggle('hidden', providerSelect.value !== 'openai');
+      if (providerSelect.value === 'gemini' && document.getElementById('modelInput').value.includes('gpt')) {
+        document.getElementById('modelInput').value = 'gemini-2.5-flash';
+      } else if (providerSelect.value === 'openai' && document.getElementById('modelInput').value.includes('gemini')) {
+        document.getElementById('modelInput').value = 'gpt-4o-mini';
+      }
+    });
+
+    document.getElementById('openSettingsBtn').addEventListener('click', () => {
+      providerSelect.value = state.settings.provider;
+      document.getElementById('apiKeyInput').value = state.settings.apiKey;
+      document.getElementById('modelInput').value = state.settings.model;
+      document.getElementById('endpointInput').value = state.settings.endpoint;
+      endpointWrap.classList.toggle('hidden', providerSelect.value !== 'openai');
+      modal.classList.remove('hidden');
+    });
+
+    document.getElementById('closeSettingsBtn').addEventListener('click', () => modal.classList.add('hidden'));
+    document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+      state.settings = {
+        provider: providerSelect.value,
+        apiKey: document.getElementById('apiKeyInput').value.trim(),
+        model: document.getElementById('modelInput').value.trim() || 'gemini-2.5-flash',
+        endpoint: document.getElementById('endpointInput').value.trim() || 'https://api.openai.com/v1'
+      };
+      try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings)); } catch (e) {}
+      modal.classList.add('hidden');
+      showToast('设置已保存');
+    });
+
+    document.getElementById('analyzeBtn').addEventListener('click', async () => {
+      const day = getCurrentDayData();
+      if (!day.clips.length) return showToast('请先导入录音或文本');
+      if (!state.settings.apiKey) {
+        document.getElementById('openSettingsBtn').click();
+        return showToast('请先填写你的 API Key');
+      }
+
+      const btn = document.getElementById('analyzeBtn');
+      btn.disabled = true;
+      btn.classList.add('opacity-60');
+      document.getElementById('reportStatusText').textContent = 'AI 正在分析录音与潜台词...';
+
+      const promptText = `你是一位个人助理与沟通心理学专家。请根据今天（${state.date}）的语音记录，严格输出纯 JSON：
+{
+  "rawSummary": "100字内今日总览",
+  "whatIDid": [{"timeRange":"HH:mm","title":"做了什么","detail":"具体内容","category":"工作/沟通/生活/思考"}],
+  "whatIExperienced": {"overallMood":"情绪基调","energyArc":"精力变化","highlights":["高光"],"frictionPoints":["消耗点"],"reflection":"总结寄语"},
+  "subtextInsights": [{"speakerOrContext":"对方角色/场景","quote":"对方原话","literalMeaning":"字面意思","realIntent":"真实意图与潜台词","emotionAndAttitude":"情绪态度","suggestedResponse":"建议回应"}]
+}`;
+
+      try {
+        let jsonStr = '';
+        if (state.settings.provider === 'gemini') {
+          const parts = [{ text: promptText }];
+          for (const c of day.clips) {
+            if (c.type === 'audio' && c.audioBase64) {
+              parts.push({ text: `[时间: ${c.time} | 文件: ${c.fileName}]` });
+              parts.push({ inlineData: { mimeType: c.mimeType || 'audio/mp4', data: c.audioBase64 } });
+            } else if (c.text) {
+              parts.push({ text: `[时间: ${c.time} | 标签: ${c.tag}]\n${c.text}` });
+            }
+          }
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(state.settings.model)}:generateContent?key=${encodeURIComponent(state.settings.apiKey)}`;
+          const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts }],
+              generationConfig: { temperature: 0.3, responseMimeType: 'application/json' }
+            })
+          });
+          if (!resp.ok) throw new Error(await resp.text());
+          const data = await resp.json();
+          jsonStr = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        } else {
+          for (const c of day.clips) {
+            if (c.type === 'audio' && c.rawFile && !c.text) {
+              const fd = new FormData();
+              fd.append('file', c.rawFile);
+              fd.append('model', 'whisper-1');
+              const wResp = await fetch(`${state.settings.endpoint.replace(/\/$/, '')}/audio/transcriptions`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${state.settings.apiKey}` },
+                body: fd
+              });
+              if (!wResp.ok) throw new Error('Whisper 转写失败: ' + await wResp.text());
+              const wData = await wResp.json();
+              c.text = wData.text;
+            }
+          }
+          const logs = day.clips.map(c => `[${c.time} | ${c.tag}]\n${c.text || ''}`).join('\n\n---\n\n');
+          const cResp = await fetch(`${state.settings.endpoint.replace(/\/$/, '')}/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${state.settings.apiKey}`
+            },
+            body: JSON.stringify({
+              model: state.settings.model,
+              temperature: 0.3,
+              messages: [
+                { role: 'system', content: '你是一个严谨输出纯 JSON 的个人复盘与沟通分析助手。' },
+                { role: 'user', content: promptText + '\n\n今日记录如下：\n' + logs }
+              ]
+            })
+          });
+          if (!cResp.ok) throw new Error(await cResp.text());
+          const cData = await cResp.json();
+          jsonStr = cData.choices?.[0]?.message?.content || '';
+        }
+
+        const start = jsonStr.indexOf('{');
+        const end = jsonStr.lastIndexOf('}');
+        day.report = JSON.parse(jsonStr.slice(start, end + 1));
+        saveState();
+        renderAll();
+        document.getElementById('reportStatusText').textContent = 'AI 分析已完成';
+        showToast('今日三维度复盘已生成！');
+      } catch (err) {
+        document.getElementById('reportStatusText').textContent = '分析失败，请检查 Key 或网络';
+        showToast('请求失败: ' + err.message.slice(0, 70));
+      } finally {
+        btn.disabled = false;
+        btn.classList.remove('opacity-60');
+      }
+    });
+
+    loadState();
+    renderAll();
+  </script>
+</body>
+</html>
