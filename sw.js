@@ -1,4 +1,4 @@
-const CACHE_NAME = 'watch-daily-memo-pwa-v1';
+const CACHE_NAME = 'watch-daily-memo-pwa-v3';
 const ASSETS = [
   './',
   './index.html',
