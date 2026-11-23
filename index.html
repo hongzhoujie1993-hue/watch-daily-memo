@@ -11,6 +11,7 @@
   <link rel="apple-touch-icon" href="./icon-192.png" />
   <title>每日复盘 — WatchDailyMemo PWA</title>
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
@@ -35,7 +36,7 @@
         </div>
         <div>
           <h1 class="text-base font-bold text-slate-900 leading-tight">每日复盘</h1>
-          <p class="text-[11px] text-slate-500">Apple Watch 录音 · 潜台词洞察</p>
+          <p class="text-[11px] text-slate-500">Apple Watch 录音 · 心率压力心情 · 潜台词</p>
         </div>
       </div>
 
@@ -79,6 +80,22 @@
         </div>
       </div>
 
+      <!-- 生理信号：心率与压力曲线 -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2">
+            <div class="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+              <i data-lucide="heart-pulse" class="w-4 h-4"></i>
+            </div>
+            <h3 class="text-sm font-bold text-slate-900">心率 & 实时压力 → 当时心情波动</h3>
+          </div>
+          <span class="text-[11px] text-slate-400">bpm / 压力指数</span>
+        </div>
+        <div class="relative h-52 w-full">
+          <canvas id="biometricChart"></canvas>
+        </div>
+      </div>
+
       <!-- 维度一 -->
       <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
         <div class="flex items-center gap-2 mb-3">
@@ -96,7 +113,7 @@
           <div class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
             <i data-lucide="activity" class="w-4 h-4"></i>
           </div>
-          <h3 class="text-sm font-bold text-slate-900">二、我今天经历了什么</h3>
+          <h3 class="text-sm font-bold text-slate-900">二、我今天经历了什么 & 当时心情剖析</h3>
         </div>
         <div id="whatIExperiencedBox" class="space-y-2.5"></div>
       </div>
@@ -113,8 +130,49 @@
       </div>
     </section>
 
-    <!-- 页面 2: 导入录音 / 转写 -->
+    <!-- 页面 2: 导入录音 / 心率压力 -->
     <section id="tab-upload" class="hidden space-y-4">
+      <div class="bg-white rounded-2xl border border-orange-200 p-4 shadow-sm space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <i data-lucide="radio" class="w-4 h-4 text-orange-600"></i>
+            <span>应用内直接录音（iPhone / 电脑麦克风）</span>
+          </h3>
+          <span id="liveRecTimer" class="text-xs font-mono font-semibold text-rose-600 hidden">00:00</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <button id="liveRecordBtn" class="flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 transition shadow-sm">
+            <i data-lucide="mic" class="w-4 h-4"></i>
+            <span id="liveRecordBtnText">点击直接开始录音</span>
+          </button>
+        </div>
+        <p class="text-[11px] text-slate-500">录完自动加入今日列表并绑定下方心率与压力；注意保持屏幕常亮以免 iOS 后台暂停网页麦克风。</p>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <i data-lucide="heart-pulse" class="w-4 h-4 text-rose-600"></i>
+            <span>关联当时心率与实时压力</span>
+          </h3>
+          <span class="text-[11px] text-slate-400">支持快捷指令自动带入</span>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs text-slate-600 mb-1">当时心率 (bpm): <strong id="hrValLabel" class="text-rose-600">85</strong></label>
+            <input type="range" id="hrInput" min="50" max="160" value="85" class="w-full accent-rose-600" />
+          </div>
+          <div>
+            <label class="block text-xs text-slate-600 mb-1">实时压力 (0-100): <strong id="stressValLabel" class="text-amber-600">45</strong></label>
+            <input type="range" id="stressInput" min="0" max="100" value="45" class="w-full accent-amber-600" />
+          </div>
+        </div>
+        <div class="text-xs text-slate-600 bg-slate-50 rounded-lg px-3 py-2 flex items-center justify-between">
+          <span>生理心情预判：</span>
+          <span id="bioMoodPreview" class="font-semibold text-slate-900">平稳专注</span>
+        </div>
+      </div>
+
       <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3">
         <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
           <i data-lucide="upload-cloud" class="w-4 h-4 text-orange-600"></i>
@@ -124,7 +182,7 @@
           <input type="file" id="audioFileInput" accept="audio/*,.m4a,.mp3,.wav" multiple class="hidden" />
           <i data-lucide="mic" class="w-7 h-7 text-orange-500 mx-auto mb-1.5"></i>
           <span class="text-sm font-medium text-slate-700 block">点此从 iPhone「文件」选择录音</span>
-          <span class="text-xs text-slate-400 mt-1 block">支持多选 · Gemini 可直接听音频分析</span>
+          <span class="text-xs text-slate-400 mt-1 block">会自动绑定上方设置的当时心率与压力</span>
         </label>
       </div>
 
@@ -144,7 +202,7 @@
         </div>
         <textarea id="clipTextInput" rows="3" placeholder="粘贴对方说的话或今日语音备忘..." class="w-full text-sm border border-slate-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
         <button id="addTextClipBtn" class="w-full py-2.5 rounded-xl bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 transition">
-          添加到今日记录
+          添加到今日记录（含心率与压力）
         </button>
       </div>
 
@@ -160,18 +218,18 @@
     <!-- 页面 3: 安装与使用 -->
     <section id="tab-guide" class="hidden space-y-3">
       <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3 text-xs sm:text-sm text-slate-700 leading-relaxed">
-        <h3 class="text-base font-bold text-slate-900">iPhone 桌面安装与手表配合步骤</h3>
+        <h3 class="text-base font-bold text-slate-900">iPhone 桌面安装与心率压力自动同步</h3>
         <div class="p-3 rounded-xl bg-orange-50 border border-orange-200">
           <div class="font-bold text-orange-900 mb-1">1. 添加到 iPhone 桌面</div>
           <p class="text-orange-800">在 iPhone 自带 <strong>Safari 浏览器</strong> 打开部署后的 HTTPS 网址 → 点底部「分享」→「添加到主屏幕」，即可像原生 App 一样全屏打开。</p>
         </div>
-        <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
-          <div class="font-bold text-slate-900 mb-1">2. Apple Watch 快捷录音</div>
-          <p>把手表自带「语音备忘录」放到表盘复杂功能或操作按钮上，抬腕即可开录；录完自动通过 iCloud 同步到 iPhone。</p>
+        <div class="p-3 rounded-xl bg-rose-50 border border-rose-200">
+          <div class="font-bold text-rose-900 mb-1">2. 自动读取 Apple Watch 心率与压力（HRV）</div>
+          <p class="text-rose-800">由于浏览器隐私限制无法直接读取 Apple Health，你可以在 iPhone「快捷指令」新建一个指令：读取「健康」最新<strong>心率</strong>和<strong>心率变异性 (HRV)</strong>，然后打开链接：<code class="bg-white px-1 rounded">https://你的域名/?hr=心率&amp;hrv=HRV</code>，打开本应用时会自动填入当时心率并换算实时压力！</p>
         </div>
         <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
           <div class="font-bold text-slate-900 mb-1">3. 填入 API Key 开始分析</div>
-          <p>点右上角齿轮图标填入 Gemini API Key（免费额度即可用，且直接支持 `.m4a` 音频）或 OpenAI 兼容 Key。</p>
+          <p>点右上角齿轮图标填入 Gemini API Key（直接支持 `.m4a` 音频）或 OpenAI 兼容 Key，AI 会结合心率波动与对方原话给出深度心情与潜台词分析。</p>
         </div>
       </div>
     </section>
@@ -238,28 +296,34 @@
       }
     } catch (e) {}
 
-    const STORAGE_KEY = 'watch_daily_memo_pwa_v1';
+    const STORAGE_KEY = 'watch_daily_memo_pwa_v2';
     const SETTINGS_KEY = 'watch_daily_memo_settings_v1';
+    let bioChartInstance = null;
 
     const DEMO_DATA = {
       clips: [
-        { id: 'd1', time: '09:40', tag: '会议', type: 'text', text: '项目晨会：产品经理说“这个需求先按现有方案走，不过下周评审时老板可能会看转化率数据，你心里有个数”。' },
-        { id: 'd2', time: '14:15', tag: '沟通', type: 'text', text: '和合作方电话：对方说“你们报价确实专业，我们内部都很认可，只是年底预算审批流程比较长，可能要等下个月再看”。' },
-        { id: 'd3', time: '19:20', tag: '日常', type: 'text', text: '下班路上语音备忘：今天改了三版方案有点累，但终于把核心逻辑理顺了，晚上想早点休息。' }
+        { id: 'd1', time: '09:40', tag: '会议', type: 'text', heartRate: 88, stressScore: 52, text: '项目晨会：产品经理说“这个需求先按现有方案走，不过下周评审时老板可能会看转化率数据，你心里有个数”。' },
+        { id: 'd2', time: '14:15', tag: '沟通', type: 'text', heartRate: 112, stressScore: 81, text: '和合作方电话：对方说“你们报价确实专业，我们内部都很认可，只是年底预算审批流程比较长，可能要等下个月再看”。' },
+        { id: 'd3', time: '19:20', tag: '日常', type: 'text', heartRate: 71, stressScore: 28, text: '下班路上语音备忘：今天改了三版方案有点累，但终于把核心逻辑理顺了，晚上想早点休息。' }
       ],
       report: {
-        rawSummary: '今天主要围绕产品方案推进与合作方沟通展开，节奏紧凑，傍晚略感疲惫但主线清晰。',
+        rawSummary: '今天主要围绕产品方案推进与合作方沟通展开，下午电话沟通时心率升至 112 bpm（高压 81），傍晚逐渐回落放松。',
         whatIDid: [
           { timeRange: '09:40 - 10:10', title: '参加项目晨会并确认当前上线方案', detail: '明确先按现有方案推进，同时提前准备下周评审的转化率数据。', category: '工作' },
           { timeRange: '14:15 - 14:40', title: '与合作方电话沟通报价与立项进度', detail: '跟进合作方内部审批反馈，对方暂未给出明确签约时间。', category: '沟通' },
           { timeRange: '19:20', title: '复盘当日方案修改并记录状态', detail: '完成三版方案逻辑梳理，决定今晚以恢复精力为主。', category: '思考' }
         ],
         whatIExperienced: {
-          overallMood: '充实中带轻微压力',
-          energyArc: '上午专注度高 → 下午商务沟通后略消耗 → 傍晚收尾有完成感',
+          overallMood: '上午平稳 → 下午高压戒备 → 傍晚释然疲惫',
+          energyArc: '心率从早间 88 bpm 飙升至下午沟通时的 112 bpm（压力 81），晚间回落至 71 bpm',
           highlights: ['成功把三版方案的核心逻辑理顺'],
-          frictionPoints: ['合作方未给明确时间节点', '高强度改稿导致晚间疲惫'],
-          reflection: '关键节点推进得很扎实；面对外部不确定性，先把可控的数据准备好会更有把握。'
+          frictionPoints: ['14:15 合作方打太极引发明显心率上升与隐性焦虑'],
+          momentMoods: [
+            { time: '09:40', heartRate: 88, stressScore: 52, mood: '警觉但克制', reason: '听到“老板看转化率”时心率微升，内心开始盘算风险。' },
+            { time: '14:15', heartRate: 112, stressScore: 81, mood: '高度紧张与挫败感', reason: '对方礼貌推诿时心率飙至 112 bpm、压力达 81，表面冷静但生理上已进入应激防御状态。' },
+            { time: '19:20', heartRate: 71, stressScore: 28, mood: '如释重负但疲惫', reason: '心率回落到静息区间，压力释放后只剩下身体疲劳。' }
+          ],
+          reflection: '下午那通电话虽然你语气平稳，但手表心率 112 bpm 说明你其实非常在意结果；晚上心率回落得很好，适合早点休息恢复。'
         },
         subtextInsights: [
           {
@@ -287,6 +351,40 @@
       byDate: {},
       settings: { provider: 'gemini', apiKey: '', model: 'gemini-2.5-flash', endpoint: 'https://api.openai.com/v1' }
     };
+
+    function estimateMoodLabel(hr, stress) {
+      if (stress >= 75 || hr >= 110) return '高压 / 紧张戒备';
+      if (stress >= 55 || hr >= 92) return '轻微焦虑 / 专注紧绷';
+      if (stress <= 30 && hr <= 75) return '放松 / 释然';
+      return '平稳专注';
+    }
+
+    function updateBioPreview() {
+      const hr = Number(document.getElementById('hrInput').value);
+      const stress = Number(document.getElementById('stressInput').value);
+      document.getElementById('hrValLabel').textContent = hr;
+      document.getElementById('stressValLabel').textContent = stress;
+      document.getElementById('bioMoodPreview').textContent = estimateMoodLabel(hr, stress);
+    }
+
+    function applyUrlParams() {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const hr = Number(params.get('hr'));
+        const hrv = Number(params.get('hrv'));
+        let stress = Number(params.get('stress'));
+        if (!stress && hrv > 0) {
+          // 简化 HRV(SDNN) -> 压力指数估算：HRV 越低压力越高
+          stress = Math.max(10, Math.min(95, Math.round(105 - hrv * 1.1)));
+        }
+        if (hr >= 40 && hr <= 200) {
+          document.getElementById('hrInput').value = hr;
+          if (stress >= 0 && stress <= 100) document.getElementById('stressInput').value = stress;
+          updateBioPreview();
+          showToast(`已从健康数据同步：心率 ${hr} bpm`);
+        }
+      } catch (e) {}
+    }
 
     function loadState() {
       try {
@@ -330,9 +428,53 @@
       return String(str || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
     }
 
+    function renderBiometricChart(clips) {
+      const canvas = document.getElementById('biometricChart');
+      if (!canvas || typeof Chart === 'undefined') return;
+      const sorted = [...(clips || [])].sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+      const labels = sorted.length ? sorted.map(c => c.time) : ['--:--'];
+      const hrData = sorted.length ? sorted.map(c => c.heartRate || 75) : [75];
+      const stressData = sorted.length ? sorted.map(c => c.stressScore || 40) : [40];
+
+      if (bioChartInstance) bioChartInstance.destroy();
+      bioChartInstance = new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: '心率 (bpm)',
+              data: hrData,
+              borderColor: '#e11d48',
+              backgroundColor: 'rgba(225, 29, 72, 0.1)',
+              tension: 0.35,
+              fill: true,
+              pointRadius: 4
+            },
+            {
+              label: '压力指数 (0-100)',
+              data: stressData,
+              borderColor: '#d97706',
+              backgroundColor: 'rgba(217, 119, 6, 0.08)',
+              tension: 0.35,
+              borderDash: [4, 4],
+              pointRadius: 4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { boxWidth: 12, font: { size: 11 } } } },
+          scales: { y: { min: 0, max: 160 } }
+        }
+      });
+    }
+
     function renderAll() {
       const day = getCurrentDayData();
       document.getElementById('clipCountBadge').textContent = `${day.clips.length} 段记录`;
+      renderBiometricChart(day.clips);
       renderReport(day.report);
       renderClipsQueue(day.clips);
       lucide.createIcons();
@@ -346,7 +488,7 @@
       if (!report) {
         document.getElementById('reportHeadline').textContent = `${state.date} 复盘待生成`;
         didEl.innerHTML = `<p class="text-xs text-slate-400">暂无数据，请先点底部「导入录音」添加内容。</p>`;
-        expEl.innerHTML = `<p class="text-xs text-slate-400">等待生成情绪与精力分析...</p>`;
+        expEl.innerHTML = `<p class="text-xs text-slate-400">等待结合心率与压力生成心情剖析...</p>`;
         subEl.innerHTML = `<p class="text-xs text-slate-400">等待拆解对方潜台词...</p>`;
         return;
       }
@@ -365,6 +507,16 @@
       `).join('');
 
       const exp = report.whatIExperienced || {};
+      const momentsHtml = (exp.momentMoods || []).map(m => `
+        <div class="p-2.5 rounded-xl bg-rose-50/50 border border-rose-100 text-xs space-y-1">
+          <div class="flex items-center justify-between">
+            <span class="font-mono font-semibold text-slate-800">${escapeHtml(m.time)} · <span class="text-rose-600">${escapeHtml(m.mood)}</span></span>
+            <span class="text-[11px] text-slate-500">心率 ${m.heartRate || '-'} bpm · 压力 ${m.stressScore ?? '-'}</span>
+          </div>
+          <p class="text-slate-600">${escapeHtml(m.reason)}</p>
+        </div>
+      `).join('');
+
       expEl.innerHTML = `
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <div class="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200">
@@ -372,10 +524,11 @@
             <div class="text-sm font-bold text-slate-900 mt-0.5">${escapeHtml(exp.overallMood || '-')}</div>
           </div>
           <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
-            <div class="text-[11px] text-slate-500 font-medium">精力曲线</div>
+            <div class="text-[11px] text-slate-500 font-medium">生理与精力变化</div>
             <div class="text-xs text-slate-800 mt-0.5">${escapeHtml(exp.energyArc || '-')}</div>
           </div>
         </div>
+        ${momentsHtml ? `<div class="space-y-2 pt-1">${momentsHtml}</div>` : ''}
         <div class="text-xs space-y-1.5 pt-1">
           <div><span class="font-semibold text-emerald-700">高光：</span>${escapeHtml((exp.highlights || []).join('；') || '无')}</div>
           <div><span class="font-semibold text-amber-700">消耗：</span>${escapeHtml((exp.frictionPoints || []).join('；') || '无')}</div>
@@ -411,10 +564,10 @@
       list.innerHTML = clips.map(c => `
         <div class="p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-start justify-between gap-2">
           <div class="space-y-1 min-w-0">
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-1.5">
               <span class="text-xs font-mono font-semibold text-orange-600">${escapeHtml(c.time)}</span>
               <span class="text-[11px] px-2 py-0.5 rounded bg-orange-100 text-orange-800">${escapeHtml(c.tag)}</span>
-              <span class="text-[11px] text-slate-400 truncate">${c.type === 'audio' ? escapeHtml(c.fileName) : '文本'}</span>
+              <span class="text-[11px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">♥ ${c.heartRate || 75} bpm · 压力 ${c.stressScore ?? 40}</span>
             </div>
             <p class="text-xs text-slate-700 break-words">${escapeHtml(c.text || '（待 AI 直接听取音频解析）')}</p>
           </div>
@@ -431,6 +584,9 @@
         });
       });
     }
+
+    document.getElementById('hrInput').addEventListener('input', updateBioPreview);
+    document.getElementById('stressInput').addEventListener('input', updateBioPreview);
 
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -464,9 +620,10 @@
         `> ${r.rawSummary || ''}`,
         `\n## 一、我今天做了什么`,
         ...(r.whatIDid || []).map(i => `- **${i.timeRange} [${i.category}] ${i.title}**：${i.detail}`),
-        `\n## 二、经历了什么`,
+        `\n## 二、经历了什么 & 当时心情`,
         `- 情绪基调：${r.whatIExperienced?.overallMood || '-'}`,
-        `- 精力曲线：${r.whatIExperienced?.energyArc || '-'}`,
+        `- 生理变化：${r.whatIExperienced?.energyArc || '-'}`,
+        ...(r.whatIExperienced?.momentMoods || []).map(m => `- **${m.time} (心率 ${m.heartRate} bpm / 压力 ${m.stressScore}) → ${m.mood}**：${m.reason}`),
         `- 总结：${r.whatIExperienced?.reflection || '-'}`,
         `\n## 三、对方讲这话是什么意思`,
         ...(r.subtextInsights || []).map(s => `- **${s.speakerOrContext}**：“${s.quote}”\n  - 真实意图：${s.realIntent}\n  - 建议回应：${s.suggestedResponse}`)
@@ -498,6 +655,8 @@
         time: document.getElementById('clipTimeInput').value || '12:00',
         tag: document.getElementById('clipTagInput').value,
         type: 'text',
+        heartRate: Number(document.getElementById('hrInput').value),
+        stressScore: Number(document.getElementById('stressInput').value),
         text
       });
       document.getElementById('clipTextInput').value = '';
@@ -510,6 +669,8 @@
       const files = Array.from(e.target.files || []);
       if (!files.length) return;
       const day = getCurrentDayData();
+      const hr = Number(document.getElementById('hrInput').value);
+      const stress = Number(document.getElementById('stressInput').value);
       for (const file of files) {
         const base64 = await new Promise((res, rej) => {
           const r = new FileReader();
@@ -525,12 +686,14 @@
           type: 'audio',
           fileName: file.name,
           mimeType: file.type || 'audio/mp4',
+          heartRate: hr,
+          stressScore: stress,
           audioBase64: base64,
           rawFile: file
         });
       }
       renderAll();
-      showToast(`已导入 ${files.length} 个录音，切回「今日复盘」点分析即可`);
+      showToast(`已导入 ${files.length} 个录音（心率 ${hr} bpm），切回「今日复盘」点分析即可`);
     });
 
     document.getElementById('clearDayBtn').addEventListener('click', () => {
@@ -586,13 +749,20 @@
       const btn = document.getElementById('analyzeBtn');
       btn.disabled = true;
       btn.classList.add('opacity-60');
-      document.getElementById('reportStatusText').textContent = 'AI 正在分析录音与潜台词...';
+      document.getElementById('reportStatusText').textContent = 'AI 正在结合心率/压力与录音剖析心情...';
 
-      const promptText = `你是一位个人助理与沟通心理学专家。请根据今天（${state.date}）的语音记录，严格输出纯 JSON：
+      const promptText = `你是一位个人助理、沟通心理学与情绪生理学专家。请结合用户今天（${state.date}）每段录音发生时的“心率(bpm)和实时压力指数(0-100)”以及语音内容，严格输出纯 JSON：
 {
   "rawSummary": "100字内今日总览",
   "whatIDid": [{"timeRange":"HH:mm","title":"做了什么","detail":"具体内容","category":"工作/沟通/生活/思考"}],
-  "whatIExperienced": {"overallMood":"情绪基调","energyArc":"精力变化","highlights":["高光"],"frictionPoints":["消耗点"],"reflection":"总结寄语"},
+  "whatIExperienced": {
+    "overallMood":"情绪基调",
+    "energyArc":"生理心率与精力变化描述",
+    "highlights":["高光"],
+    "frictionPoints":["消耗点"],
+    "momentMoods":[{"time":"HH:mm","heartRate":100,"stressScore":75,"mood":"当时真实心情","reason":"结合当时心率/压力与对话内容解释为什么是这种心情"}],
+    "reflection":"总结寄语"
+  },
   "subtextInsights": [{"speakerOrContext":"对方角色/场景","quote":"对方原话","literalMeaning":"字面意思","realIntent":"真实意图与潜台词","emotionAndAttitude":"情绪态度","suggestedResponse":"建议回应"}]
 }`;
 
@@ -601,11 +771,12 @@
         if (state.settings.provider === 'gemini') {
           const parts = [{ text: promptText }];
           for (const c of day.clips) {
+            const bio = `当时心率 ${c.heartRate || 75} bpm, 实时压力 ${c.stressScore ?? 40}/100`;
             if (c.type === 'audio' && c.audioBase64) {
-              parts.push({ text: `[时间: ${c.time} | 文件: ${c.fileName}]` });
+              parts.push({ text: `[时间: ${c.time} | ${bio} | 文件: ${c.fileName}]` });
               parts.push({ inlineData: { mimeType: c.mimeType || 'audio/mp4', data: c.audioBase64 } });
             } else if (c.text) {
-              parts.push({ text: `[时间: ${c.time} | 标签: ${c.tag}]\n${c.text}` });
+              parts.push({ text: `[时间: ${c.time} | 标签: ${c.tag} | ${bio}]\n${c.text}` });
             }
           }
           const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(state.settings.model)}:generateContent?key=${encodeURIComponent(state.settings.apiKey)}`;
@@ -636,7 +807,7 @@
               c.text = wData.text;
             }
           }
-          const logs = day.clips.map(c => `[${c.time} | ${c.tag}]\n${c.text || ''}`).join('\n\n---\n\n');
+          const logs = day.clips.map(c => `[${c.time} | ${c.tag} | 心率 ${c.heartRate || 75} bpm | 压力 ${c.stressScore ?? 40}/100]\n${c.text || ''}`).join('\n\n---\n\n');
           const cResp = await fetch(`${state.settings.endpoint.replace(/\/$/, '')}/chat/completions`, {
             method: 'POST',
             headers: {
@@ -647,7 +818,7 @@
               model: state.settings.model,
               temperature: 0.3,
               messages: [
-                { role: 'system', content: '你是一个严谨输出纯 JSON 的个人复盘与沟通分析助手。' },
+                { role: 'system', content: '你是一个严谨输出纯 JSON 的个人复盘与情绪生理分析助手。' },
                 { role: 'user', content: promptText + '\n\n今日记录如下：\n' + logs }
               ]
             })
@@ -663,7 +834,7 @@
         saveState();
         renderAll();
         document.getElementById('reportStatusText').textContent = 'AI 分析已完成';
-        showToast('今日三维度复盘已生成！');
+        showToast('今日复盘与心情剖析已生成！');
       } catch (err) {
         document.getElementById('reportStatusText').textContent = '分析失败，请检查 Key 或网络';
         showToast('请求失败: ' + err.message.slice(0, 70));
@@ -673,7 +844,97 @@
       }
     });
 
+
+    // 应用内直接录音 (MediaRecorder)
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let recInterval = null;
+    let recSeconds = 0;
+
+    function formatRecTime(sec) {
+      const m = String(Math.floor(sec / 60)).padStart(2, '0');
+      const s = String(sec % 60).padStart(2, '0');
+      return `${m}:${s}`;
+    }
+
+    document.getElementById('liveRecordBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('liveRecordBtn');
+      const btnText = document.getElementById('liveRecordBtnText');
+      const timerEl = document.getElementById('liveRecTimer');
+
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        clearInterval(recInterval);
+        btn.classList.remove('bg-rose-600', 'hover:bg-rose-700');
+        btn.classList.add('bg-orange-600', 'hover:bg-orange-700');
+        btnText.textContent = '点击直接开始录音';
+        timerEl.classList.add('hidden');
+        return;
+      }
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        return showToast('当前浏览器环境不支持网页直接录音，请用 Safari 打开');
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mimeType = MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4'
+          : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '');
+        mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+        recordedChunks = [];
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = () => {
+          stream.getTracks().forEach(t => t.stop());
+          const finalMime = mediaRecorder.mimeType || 'audio/mp4';
+          const ext = finalMime.includes('webm') ? 'webm' : 'm4a';
+          const blob = new Blob(recordedChunks, { type: finalMime });
+          const reader = new FileReader();
+          reader.onload = () => {
+            const base64 = reader.result.split(',')[1];
+            const now = new Date();
+            const day = getCurrentDayData();
+            day.clips.push({
+              id: 'rec_' + Date.now(),
+              time: now.toTimeString().slice(0, 5),
+              tag: '现场录音',
+              type: 'audio',
+              fileName: `live_${now.getHours()}${now.getMinutes()}${now.getSeconds()}.${ext}`,
+              mimeType: finalMime,
+              heartRate: Number(document.getElementById('hrInput').value),
+              stressScore: Number(document.getElementById('stressInput').value),
+              audioBase64: base64,
+              rawFile: new File([blob], `live.${ext}`, { type: finalMime })
+            });
+            renderAll();
+            showToast('现场录音已保存，切回「今日复盘」点 AI 分析即可');
+          };
+          reader.readAsDataURL(blob);
+        };
+
+        mediaRecorder.start();
+        recSeconds = 0;
+        timerEl.textContent = '00:00';
+        timerEl.classList.remove('hidden');
+        recInterval = setInterval(() => {
+          recSeconds += 1;
+          timerEl.textContent = formatRecTime(recSeconds);
+        }, 1000);
+
+        btn.classList.remove('bg-orange-600', 'hover:bg-orange-700');
+        btn.classList.add('bg-rose-600', 'hover:bg-rose-700');
+        btnText.textContent = '正在录音，点击停止并保存';
+      } catch (err) {
+        showToast('无法开启麦克风：' + (err.message || '请允许麦克风权限'));
+      }
+    });
+
     loadState();
+    updateBioPreview();
+    applyUrlParams();
     renderAll();
   </script>
 </body>
